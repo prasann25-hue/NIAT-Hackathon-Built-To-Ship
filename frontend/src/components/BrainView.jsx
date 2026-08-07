@@ -18,24 +18,50 @@ export default function BrainView({ data = mockBrainData }) {
   const { recentCommits, jiraTickets, sampleDiagnosis } = data;
 
   const [logText, setLogText] = useState(sampleStackTrace);
+  const [repoLink, setRepoLink] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [diagnosisData, setDiagnosisData] = useState(null);
+
+  // NEW STATE: Holds the real commits for the UI instead of the mock ones
+  const [realCommits, setRealCommits] = useState(recentCommits);
 
   const [chatInput, setChatInput] = useState('');
   const [chatMessages, setChatMessages] = useState([
     {
       sender: 'ai',
-      text: 'Institutional Brain online. I have ingested 4,120 commit diffs and 820 solved Jira incidents. Ready to analyze stack traces and correlate root causes.'
+      text: 'Institutional Brain online. Please provide a GitHub repository link and paste your stack trace below for analysis.'
     }
   ]);
 
   const handleAnalyze = async () => {
     setIsAnalyzing(true);
     setDiagnosisData(null);
+
+    // NEW LOGIC: Fetch the latest 3 commits directly for the Sidebar UI
+    try {
+      let path = 'facebook/react';
+      if (repoLink) {
+        path = repoLink.replace('https://github.com/', '').replace('http://github.com/', '').replace(/\/$/, '');
+      }
+      const gitRes = await fetch(`https://api.github.com/repos/${path}/commits?per_page=3`);
+      if (gitRes.ok) {
+        const gitData = await gitRes.json();
+        const formattedCommits = gitData.map(c => ({
+          id: c.sha.substring(0, 7),
+          time: new Date(c.commit.author.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          message: c.commit.message.split('\n')[0], // Only grab the first line of the commit message
+          author: c.commit.author.name
+        }));
+        setRealCommits(formattedCommits);
+      }
+    } catch (error) {
+      console.error("Failed to fetch UI commits", error);
+    }
+
     try {
       const response = await apiFetch('/api/ops-brain', {
         method: 'POST',
-        body: JSON.stringify({ query: "Analyze this stack trace: " + logText })
+        body: JSON.stringify({ query: "Analyze this stack trace: " + logText, repoUrl: repoLink })
       });
 
       setDiagnosisData(sampleDiagnosis || mockBrainData.sampleDiagnosis);
@@ -65,7 +91,7 @@ export default function BrainView({ data = mockBrainData }) {
     try {
       const response = await apiFetch('/api/ops-brain', {
         method: 'POST',
-        body: JSON.stringify({ query: userMsg })
+        body: JSON.stringify({ query: userMsg, repoUrl: repoLink })
       });
 
       setChatMessages((prev) => [
@@ -113,7 +139,7 @@ export default function BrainView({ data = mockBrainData }) {
             </div>
           </div>
 
-          {/* 'Recent Commits' List */}
+          {/* 'Recent Commits' List - NOW MAPPED TO REAL COMMITS */}
           <div className="space-y-3 pt-4 border-t border-zinc-300 dark:border-zinc-700">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold text-zinc-500 dark:text-zinc-400 tracking-wider uppercase flex items-center gap-1.5 font-tech">
@@ -126,7 +152,7 @@ export default function BrainView({ data = mockBrainData }) {
             </div>
 
             <div className="space-y-3.5">
-              {recentCommits.map((commit) => (
+              {realCommits.map((commit) => (
                 <div
                   key={commit.id}
                   className="bg-white dark:bg-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 border border-zinc-300 dark:border-zinc-700 rounded-lg p-4 transition-colors shadow-[0_4px_14px_rgba(0,0,0,0.15)]"
@@ -207,6 +233,19 @@ export default function BrainView({ data = mockBrainData }) {
 
       {/* Segmented Right Workspace (70% width) - Transparent wrapper with hidden scrollbar */}
       <section className={`w-full lg:w-[70%] bg-transparent flex flex-col space-y-6 overflow-y-auto ${hideScrollbar}`}>
+
+        {/* REPO INPUT FIELD */}
+        <div className="bg-zinc-100 dark:bg-zinc-900 rounded-xl p-4 px-6 border border-white/10 shadow-md flex-shrink-0 flex items-center gap-3">
+          <GitCommit className="w-5 h-5 text-zinc-950 dark:text-white flex-shrink-0" />
+          <input
+            type="text"
+            value={repoLink}
+            onChange={(e) => setRepoLink(e.target.value)}
+            placeholder="Target Repository URL (e.g., https://github.com/facebook/react)"
+            className="w-full bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 focus:border-zinc-500 text-sm font-bold text-zinc-950 dark:text-white rounded-lg px-4 py-2 focus:outline-none shadow-[0_4px_14px_rgba(0,0,0,0.15)] transition-colors placeholder:text-zinc-400 font-outfit"
+          />
+        </div>
+
         {/* Card 1: Raw Log Input Area rounded-xl bg-zinc-100 dark:bg-zinc-900 */}
         <div className="bg-zinc-100 dark:bg-zinc-900 rounded-xl p-6 border border-white/10 shadow-xl space-y-4 flex-shrink-0">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-300 dark:border-zinc-700 pb-3.5">
@@ -261,7 +300,7 @@ export default function BrainView({ data = mockBrainData }) {
               Traversing Institutional Graph & Vector Embeddings...
             </h3>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 font-bold mt-1.5 font-fira">
-              Matching error tokens against Commit a1b2c3d and Ticket DEV-402
+              Fetching commits from {repoLink || 'Default Repository'}
             </p>
           </div>
         )}
@@ -392,8 +431,8 @@ export default function BrainView({ data = mockBrainData }) {
                 <div
                   key={index}
                   className={`flex items-start gap-4 p-4.5 rounded-lg shadow-[0_4px_14px_rgba(0,0,0,0.15)] ${isAI
-                      ? 'bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-950 dark:text-white font-medium'
-                      : 'bg-black border border-black text-white font-medium ml-6 sm:ml-12 shadow-[0_6px_18px_rgba(0,0,0,0.25)]'
+                    ? 'bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-950 dark:text-white font-medium'
+                    : 'bg-black border border-black text-white font-medium ml-6 sm:ml-12 shadow-[0_6px_18px_rgba(0,0,0,0.25)]'
                     }`}
                 >
                   <div className={`px-2.5 py-1 rounded-md flex-shrink-0 mt-0.5 font-bold text-xs font-tech border shadow-sm ${isAI ? 'bg-black text-white border-black' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-950 dark:text-white border-zinc-300 dark:border-zinc-700'
