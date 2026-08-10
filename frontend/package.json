@@ -15,16 +15,16 @@
     "@tailwindcss/postcss": "^4.3.3",
     "@vitejs/plugin-react": "^6.0.5",
     "autoprefixer": "^10.5.4",
-    "axios": "^1.19.0",
-    "lucide-react": "^1.28.0",
     "postcss": "^8.5.25",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
     "tailwindcss": "^4.3.3",
     "vite": "^8.2.0"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.2",
+    "axios": "^1.19.0",
+    "lucide-react": "^1.28.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.2"
   }
 }
