@@ -75,15 +75,19 @@ export default function ArchitectView({
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
+      // Pass both the requirements and the githubUrl to the backend
       const response = await apiFetch('/api/architect', {
         method: 'POST',
-        body: JSON.stringify({ prompt: requirements })
+        body: JSON.stringify({ 
+          prompt: requirements,
+          githubUrl: githubUrl 
+        })
       });
       setArchData(response.data || response);
       setIsGenerating(false);
     } catch (error) {
       console.error("API Error:", error);
-      // Fallback so the demo doesn't crash in front of judges
+      // Fallback so the app doesn't crash on network errors
       setTimeout(() => {
         setArchData(mockArchitectData);
         setIsGenerating(false);

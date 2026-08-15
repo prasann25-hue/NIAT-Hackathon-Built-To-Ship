@@ -4,26 +4,18 @@ import {
   Activity, GitCommit, Ticket, Terminal, AlertCircle, CheckCircle,
   MessageSquare, ArrowRight, FileCode, Loader2
 } from 'lucide-react';
-import { mockBrainData } from '../mockData';
-
-const sampleStackTrace = `[ERROR] 2026-08-06T00:15:22.412Z - PoolExhaustedError: Timeout waiting for client connection from pool
-    at Pool._connect (/app/node_modules/pg-pool/index.js:219:19)
-    at TournamentEngine.handleMatchmaking (/app/services/tournament/matchmaking.js:84:22)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)
-[WARN] 2026-08-06T00:15:23.001Z - WebSocket connection dropped for 4,120 subscribers in lobby_id=eu_west_prime due to upstream latency.`;
 
 const hideScrollbar = "[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]";
 
-export default function BrainView({ data = mockBrainData }) {
-  const { recentCommits, jiraTickets, sampleDiagnosis } = data;
-
-  const [logText, setLogText] = useState(sampleStackTrace);
+export default function BrainView() {
+  // All state initialized as empty for production
+  const [logText, setLogText] = useState('');
   const [repoLink, setRepoLink] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [diagnosisData, setDiagnosisData] = useState(null);
-
-  // NEW STATE: Holds the real commits for the UI instead of the mock ones
-  const [realCommits, setRealCommits] = useState(recentCommits);
+  
+  const [realCommits, setRealCommits] = useState([]);
+  const [jiraTickets, setJiraTickets] = useState([]); // Will remain empty until you build a Jira API integration
 
   const [chatInput, setChatInput] = useState('');
   const [chatMessages, setChatMessages] = useState([
@@ -34,10 +26,11 @@ export default function BrainView({ data = mockBrainData }) {
   ]);
 
   const handleAnalyze = async () => {
+    if (!logText.trim()) return;
+    
     setIsAnalyzing(true);
     setDiagnosisData(null);
 
-    // NEW LOGIC: Fetch the latest 3 commits directly for the Sidebar UI
     try {
       let path = 'facebook/react';
       if (repoLink) {
@@ -49,7 +42,7 @@ export default function BrainView({ data = mockBrainData }) {
         const formattedCommits = gitData.map(c => ({
           id: c.sha.substring(0, 7),
           time: new Date(c.commit.author.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          message: c.commit.message.split('\n')[0], // Only grab the first line of the commit message
+          message: c.commit.message.split('\n')[0],
           author: c.commit.author.name
         }));
         setRealCommits(formattedCommits);
@@ -64,7 +57,8 @@ export default function BrainView({ data = mockBrainData }) {
         body: JSON.stringify({ query: "Analyze this stack trace: " + logText, repoUrl: repoLink })
       });
 
-      setDiagnosisData(sampleDiagnosis || mockBrainData.sampleDiagnosis);
+      // No more mock fallback. If the backend doesn't send a structured diagnosis, it stays null.
+      setDiagnosisData(response.diagnosisData || null);
       setIsAnalyzing(false);
 
       setChatMessages((prev) => [
@@ -77,6 +71,10 @@ export default function BrainView({ data = mockBrainData }) {
     } catch (error) {
       console.error(error);
       setIsAnalyzing(false);
+      setChatMessages((prev) => [
+        ...prev,
+        { sender: 'ai', text: 'Error: Failed to connect to the intelligence engine.' }
+      ]);
     }
   };
 
@@ -105,10 +103,9 @@ export default function BrainView({ data = mockBrainData }) {
 
   return (
     <div className="h-full w-full bg-black text-zinc-950 dark:text-white font-outfit font-medium flex flex-col lg:flex-row p-4 lg:p-6 gap-6 overflow-hidden relative">
-      {/* Floating Left Context Sidebar (30% width) - bg-zinc-100 dark:bg-zinc-900 rounded-xl with hidden scrollbar */}
+      {/* Floating Left Context Sidebar */}
       <aside className={`w-full lg:w-[30%] bg-zinc-100 dark:bg-zinc-900 rounded-xl p-5 lg:p-6 border border-white/10 shadow-xl flex flex-col justify-between overflow-y-auto ${hideScrollbar} flex-shrink-0 z-10`}>
         <div className="space-y-6">
-          {/* Header */}
           <div>
             <div className="flex items-center gap-2 text-xs font-bold text-zinc-500 dark:text-zinc-400 tracking-wider uppercase mb-1.5 font-tech">
               <Terminal className="w-4 h-4 text-zinc-950 dark:text-white" />
@@ -122,7 +119,7 @@ export default function BrainView({ data = mockBrainData }) {
             </p>
           </div>
 
-          {/* 'System Health' Widget - pure bg-white dark:bg-zinc-800 with custom shadow-[0_4px_14px_rgba(0,0,0,0.15)] */}
+          {/* System Health Widget */}
           <div className="bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg p-4.5 shadow-[0_4px_14px_rgba(0,0,0,0.15)]">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 tracking-wider uppercase font-tech">
@@ -130,111 +127,74 @@ export default function BrainView({ data = mockBrainData }) {
               </span>
               <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-black text-white font-bold border border-black font-tech text-xs shadow-sm">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>99.9% Uptime</span>
+                <span>Operational</span>
               </div>
             </div>
             <div className="flex items-center gap-2 text-xs text-zinc-950 dark:text-white bg-zinc-100 dark:bg-zinc-900 px-3.5 py-2.5 rounded-lg border border-zinc-300 dark:border-zinc-700 mt-2 font-tech font-bold shadow-sm">
               <CheckCircle className="w-4 h-4 text-zinc-950 dark:text-white flex-shrink-0" />
-              <span className="truncate">Active Log Ingestion: <span className="bg-black text-white font-bold px-2 py-0.5 rounded-md border border-black ml-1 font-tech">Operational</span></span>
+              <span className="truncate">Active Log Ingestion: <span className="bg-black text-white font-bold px-2 py-0.5 rounded-md border border-black ml-1 font-tech">Ready</span></span>
             </div>
           </div>
 
-          {/* 'Recent Commits' List - NOW MAPPED TO REAL COMMITS */}
+          {/* Recent Commits List */}
           <div className="space-y-3 pt-4 border-t border-zinc-300 dark:border-zinc-700">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold text-zinc-500 dark:text-zinc-400 tracking-wider uppercase flex items-center gap-1.5 font-tech">
                 <GitCommit className="w-4 h-4 text-zinc-950 dark:text-white" />
                 <span>RECENT COMMITS</span>
               </h3>
-              <span className="text-xs font-tech text-zinc-950 dark:text-white bg-white dark:bg-zinc-800 px-2.5 py-0.5 rounded-md border border-zinc-300 dark:border-zinc-700 font-bold shadow-sm">
-                Main Branch
-              </span>
             </div>
 
             <div className="space-y-3.5">
-              {realCommits.map((commit) => (
-                <div
-                  key={commit.id}
-                  className="bg-white dark:bg-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 border border-zinc-300 dark:border-zinc-700 rounded-lg p-4 transition-colors shadow-[0_4px_14px_rgba(0,0,0,0.15)]"
-                >
-                  <div className="flex items-center justify-between gap-2 mb-2.5">
-                    <span className="font-fira bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-950 dark:text-white px-2.5 py-0.5 rounded-md text-xs font-bold shadow-sm">
-                      {commit.id}
-                    </span>
-                    <span className="text-xs text-zinc-500 dark:text-zinc-400 font-bold font-outfit">
-                      {commit.time}
-                    </span>
+              {realCommits.length > 0 ? (
+                realCommits.map((commit) => (
+                  <div key={commit.id} className="bg-white dark:bg-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 border border-zinc-300 dark:border-zinc-700 rounded-lg p-4 transition-colors shadow-[0_4px_14px_rgba(0,0,0,0.15)]">
+                    <div className="flex items-center justify-between gap-2 mb-2.5">
+                      <span className="font-fira bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-950 dark:text-white px-2.5 py-0.5 rounded-md text-xs font-bold shadow-sm">
+                        {commit.id}
+                      </span>
+                      <span className="text-xs text-zinc-500 dark:text-zinc-400 font-bold font-outfit">
+                        {commit.time}
+                      </span>
+                    </div>
+                    <p className="text-base font-bold text-zinc-950 dark:text-white leading-snug font-outfit">
+                      {commit.message}
+                    </p>
+                    <div className="mt-3 text-xs text-zinc-500 dark:text-zinc-400 font-bold flex items-center justify-between border-t border-zinc-300 dark:border-zinc-700 pt-2.5 font-outfit">
+                      <span>Committer:</span>
+                      <span className="text-zinc-950 dark:text-white font-bold">{commit.author}</span>
+                    </div>
                   </div>
-                  <p className="text-base font-bold text-zinc-950 dark:text-white leading-snug font-outfit">
-                    {commit.message}
-                  </p>
-                  <div className="mt-3 text-xs text-zinc-500 dark:text-zinc-400 font-bold flex items-center justify-between border-t border-zinc-300 dark:border-zinc-700 pt-2.5 font-outfit">
-                    <span>Committer:</span>
-                    <span className="text-zinc-950 dark:text-white font-bold">{commit.author}</span>
-                  </div>
+                ))
+              ) : (
+                <div className="text-xs text-zinc-500 dark:text-zinc-400 font-bold text-center py-4">
+                  No repository linked. Provide a URL to fetch commits.
                 </div>
-              ))}
+              )}
             </div>
           </div>
 
-          {/* 'Active Jira Tickets' List */}
+          {/* Active Jira Tickets List */}
           <div className="space-y-3 pt-4 border-t border-zinc-300 dark:border-zinc-700">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold text-zinc-500 dark:text-zinc-400 tracking-wider uppercase flex items-center gap-1.5 font-tech">
                 <Ticket className="w-4 h-4 text-zinc-950 dark:text-white" />
                 <span>ACTIVE JIRA TICKETS</span>
               </h3>
-              <span className="text-xs font-tech text-zinc-950 dark:text-white bg-white dark:bg-zinc-800 px-2.5 py-0.5 rounded-md border border-zinc-300 dark:border-zinc-700 font-bold shadow-sm">
-                Live Queue
-              </span>
             </div>
-
             <div className="space-y-3.5">
-              {jiraTickets.map((ticket) => {
-                const getPriorityBadgeClass = (priority) => {
-                  if (priority === 'Critical') return 'bg-red-100 text-red-800 border border-red-200 font-bold';
-                  if (priority === 'High') return 'bg-orange-100 text-orange-800 border border-orange-200 font-bold';
-                  return 'bg-zinc-100 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700 font-bold';
-                };
-
-                const getStatusTextClass = (status) => {
-                  if (status === 'Resolved') return 'text-emerald-600 font-semibold';
-                  if (status === 'In Progress') return 'text-blue-600 font-semibold';
-                  return 'text-zinc-500 dark:text-zinc-400 font-medium';
-                };
-
-                return (
-                  <div
-                    key={ticket.key}
-                    className="bg-white dark:bg-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 border border-zinc-300 dark:border-zinc-700 rounded-lg p-4 transition-colors shadow-[0_4px_14px_rgba(0,0,0,0.15)]"
-                  >
-                    <div className="flex items-center justify-between mb-2.5">
-                      <span className="font-fira text-xs font-bold text-zinc-950 dark:text-white bg-zinc-100 dark:bg-zinc-900 px-2.5 py-0.5 rounded-md border border-zinc-300 dark:border-zinc-700 shadow-sm">
-                        {ticket.key}
-                      </span>
-                      <span className={`text-xs font-tech uppercase px-2 py-0.5 rounded-md shadow-sm ${getPriorityBadgeClass(ticket.priority)}`}>
-                        {ticket.priority}
-                      </span>
-                    </div>
-                    <h4 className="text-base font-bold text-zinc-950 dark:text-white leading-snug font-outfit">
-                      {ticket.title}
-                    </h4>
-                    <div className="mt-3 flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400 font-bold border-t border-zinc-300 dark:border-zinc-700 pt-2.5 font-outfit">
-                      <span>Status:</span>
-                      <span className={`font-tech ${getStatusTextClass(ticket.status)}`}>{ticket.status}</span>
-                    </div>
+               {jiraTickets.length === 0 && (
+                  <div className="text-xs text-zinc-500 dark:text-zinc-400 font-bold text-center py-4">
+                    Jira integration not configured.
                   </div>
-                );
-              })}
+               )}
             </div>
           </div>
         </div>
       </aside>
 
-      {/* Segmented Right Workspace (70% width) - Transparent wrapper with hidden scrollbar */}
+      {/* Right Workspace */}
       <section className={`w-full lg:w-[70%] bg-transparent flex flex-col space-y-6 overflow-y-auto ${hideScrollbar}`}>
-
-        {/* REPO INPUT FIELD */}
         <div className="bg-zinc-100 dark:bg-zinc-900 rounded-xl p-4 px-6 border border-white/10 shadow-md flex-shrink-0 flex items-center gap-3">
           <GitCommit className="w-5 h-5 text-zinc-950 dark:text-white flex-shrink-0" />
           <input
@@ -246,18 +206,13 @@ export default function BrainView({ data = mockBrainData }) {
           />
         </div>
 
-        {/* Card 1: Raw Log Input Area rounded-xl bg-zinc-100 dark:bg-zinc-900 */}
         <div className="bg-zinc-100 dark:bg-zinc-900 rounded-xl p-6 border border-white/10 shadow-xl space-y-4 flex-shrink-0">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-300 dark:border-zinc-700 pb-3.5">
             <div className="flex items-center gap-2.5 font-outfit text-lg font-bold text-zinc-950 dark:text-white tracking-tight">
               <Terminal className="w-5 h-5 text-zinc-950 dark:text-white" />
               <span>Raw Production Log Ingestion & Stack Trace</span>
             </div>
-            <span className="text-xs uppercase font-bold text-zinc-950 dark:text-white tracking-wider font-tech px-3 py-1 rounded-md bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 self-start sm:self-auto shadow-[0_4px_14px_rgba(0,0,0,0.15)]">
-              ANOMALY DETECTION
-            </span>
           </div>
-
           <div className="relative">
             <textarea
               rows={5}
@@ -267,14 +222,13 @@ export default function BrainView({ data = mockBrainData }) {
               className={`w-full bg-black text-emerald-400 font-fira p-5 rounded-lg border-none focus:outline-none focus:ring-1 focus:ring-emerald-500 text-xs leading-relaxed resize-y shadow-inner ${hideScrollbar}`}
             />
           </div>
-
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1 font-outfit">
             <span className="text-xs text-zinc-500 dark:text-zinc-400 font-bold flex items-center gap-1.5">
-              <span>RAG Engine ready to correlate stack trace against Jira & GitHub history.</span>
+              <span>RAG Engine ready to correlate stack trace against history.</span>
             </span>
             <button
               onClick={handleAnalyze}
-              disabled={isAnalyzing}
+              disabled={isAnalyzing || !logText.trim()}
               className="px-6 py-3 rounded-lg bg-black hover:bg-zinc-900 text-white font-bold text-xs tracking-wide uppercase transition-colors disabled:opacity-60 flex items-center justify-center gap-2 self-end sm:self-auto cursor-pointer border border-zinc-800 shadow-xl active:translate-y-[0.5px]"
             >
               {isAnalyzing ? (
@@ -292,134 +246,17 @@ export default function BrainView({ data = mockBrainData }) {
           </div>
         </div>
 
-        {/* Card 2: Loading State rounded-xl */}
         {isAnalyzing && (
           <div className="py-14 flex flex-col items-center justify-center bg-zinc-100 dark:bg-zinc-900 rounded-xl border border-white/10 shadow-xl text-center">
             <Loader2 className="w-9 h-9 animate-spin text-zinc-950 dark:text-white mb-3.5" />
             <h3 className="text-lg font-bold text-zinc-950 dark:text-white tracking-tight font-outfit">
               Traversing Institutional Graph & Vector Embeddings...
             </h3>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 font-bold mt-1.5 font-fira">
-              Fetching commits from {repoLink || 'Default Repository'}
-            </p>
           </div>
         )}
 
-        {/* Card 3 & 4: RAG Diagnosis Result Floating Cards rounded-xl */}
-        {diagnosisData && !isAnalyzing && (
-          <>
-            {/* Root Cause Banner - Floating Card rounded-xl */}
-            <div className="bg-zinc-100 dark:bg-zinc-900 rounded-xl p-6 border border-white/10 text-zinc-950 dark:text-white shadow-xl space-y-5 animate-in fade-in duration-200 flex-shrink-0">
-              <div className="flex items-start gap-4">
-                <AlertCircle className="w-6 h-6 text-zinc-950 dark:text-white flex-shrink-0 mt-0.5" />
-                <div className="space-y-2 flex-1">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-bold text-zinc-950 dark:text-white tracking-tight font-outfit">
-                      Root Cause Identified
-                    </h3>
-                    <span className="text-xs font-tech font-bold text-white bg-black px-3 py-1 rounded-md border border-black shadow-sm">
-                      Confidence: 99.4%
-                    </span>
-                  </div>
-                  <p className="text-base text-zinc-950 dark:text-white font-bold leading-relaxed font-outfit">
-                    {diagnosisData.rootCause}
-                  </p>
-                </div>
-              </div>
+        {/* Diagnosis UI removed. Will rely purely on the Chat dialogue until the backend is updated to send JSON objects back for diagnosis */}
 
-              {/* Matched Historical Context */}
-              {diagnosisData.matchedSources && (
-                <div className="pt-4 border-t border-zinc-300 dark:border-zinc-700">
-                  <span className="text-xs font-bold font-tech text-zinc-500 dark:text-zinc-400 tracking-wider uppercase block mb-3">
-                    MATCHED INSTITUTIONAL CONTEXT & CITATIONS:
-                  </span>
-                  <div className="flex flex-wrap gap-3">
-                    {diagnosisData.matchedSources.map((src, idx) => {
-                      const isPR = src.type?.includes('PR');
-                      const IconComponent = isPR ? FileCode : Ticket;
-                      return (
-                        <a
-                          key={idx}
-                          href={src.link || '#'}
-                          onClick={(e) => e.preventDefault()}
-                          className="flex items-center gap-2.5 bg-white dark:bg-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 border border-zinc-300 dark:border-zinc-700 px-4 py-2.5 rounded-lg text-xs font-bold transition-colors shadow-[0_4px_14px_rgba(0,0,0,0.15)] cursor-pointer text-zinc-950 dark:text-white"
-                        >
-                          <IconComponent className="w-4 h-4 text-zinc-950 dark:text-white flex-shrink-0" />
-                          <div className="font-outfit">
-                            <span className="font-bold text-zinc-950 dark:text-white mr-1.5 font-fira">
-                              [{src.type}]
-                            </span>
-                            <span className="text-zinc-950 dark:text-white font-bold">
-                              {src.reference?.split(':')[0] || src.reference}
-                            </span>
-                            {src.reference?.includes(':') && (
-                              <span className="hidden md:inline text-zinc-500 dark:text-zinc-400 ml-1.5 text-xs font-bold">
-                                — {src.reference.split(':')[1]}
-                              </span>
-                            )}
-                          </div>
-                        </a>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Code Patch Diff Viewer - Floating Card rounded-xl with rounded-lg black terminal cutouts */}
-            <div className="bg-zinc-100 dark:bg-zinc-900 rounded-xl p-6 border border-white/10 shadow-xl space-y-5 animate-in fade-in duration-200 flex-shrink-0">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3.5 border-b border-zinc-300 dark:border-zinc-700 gap-2">
-                <h3 className="text-lg font-bold text-zinc-950 dark:text-white tracking-tight flex items-center gap-2.5 font-outfit">
-                  <FileCode className="w-5 h-5 text-zinc-950 dark:text-white" />
-                  <span>Automated Patch Recommendation & Diff Viewer</span>
-                </h3>
-                <span className="text-xs font-tech bg-black text-white font-bold px-3.5 py-1 rounded-md border border-black shadow-sm self-start sm:self-auto">
-                  Verified Patch
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                {/* Original Code */}
-                <div className="rounded-lg overflow-hidden shadow-lg border border-black bg-black">
-                  <div className="bg-white dark:bg-zinc-800 border-b border-zinc-300 dark:border-zinc-700 px-4 py-2.5 flex items-center justify-between text-xs font-tech font-bold">
-                    <span className="text-zinc-950 dark:text-white flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 text-zinc-950 dark:text-white flex-shrink-0" />
-                      <span>Original (Vulnerable)</span>
-                    </span>
-                    <span className="bg-black text-white px-2.5 py-0.5 rounded-md text-xs font-bold uppercase shadow-sm">
-                      BUG
-                    </span>
-                  </div>
-                  <div className={`p-5 bg-black text-red-400 font-fira text-xs border-none overflow-auto ${hideScrollbar}`}>
-                    <pre className="leading-relaxed">
-                      <code>{diagnosisData.originalCode}</code>
-                    </pre>
-                  </div>
-                </div>
-
-                {/* Fixed Code */}
-                <div className="rounded-lg overflow-hidden shadow-lg border border-black bg-black">
-                  <div className="bg-white dark:bg-zinc-800 border-b border-zinc-300 dark:border-zinc-700 px-4 py-2.5 flex items-center justify-between text-xs font-tech font-bold">
-                    <span className="text-zinc-950 dark:text-white flex items-center gap-2">
-                      <CheckCircle className="w-4 h-4 text-zinc-950 dark:text-white flex-shrink-0" />
-                      <span>Automated Remediation Patch</span>
-                    </span>
-                    <span className="bg-black text-white px-2.5 py-0.5 rounded-md text-xs font-bold uppercase shadow-sm">
-                      FIX
-                    </span>
-                  </div>
-                  <div className={`p-5 bg-black text-emerald-400 font-fira text-xs border-none overflow-auto ${hideScrollbar}`}>
-                    <pre className="leading-relaxed">
-                      <code>{diagnosisData.fixedCode}</code>
-                    </pre>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Card 5: Institutional AI Triage Dialogue (Chat Messages) - Floating Card rounded-xl bg-zinc-100 dark:bg-zinc-900 */}
         <div className="bg-zinc-100 dark:bg-zinc-900 rounded-xl p-6 border border-white/10 shadow-xl space-y-4 flex-shrink-0">
           <h3 className="text-xs font-bold text-zinc-500 dark:text-zinc-400 tracking-wider uppercase font-tech border-b border-zinc-300 dark:border-zinc-700 pb-3">
             INSTITUTIONAL AI TRIAGE DIALOGUE
@@ -428,21 +265,11 @@ export default function BrainView({ data = mockBrainData }) {
             {chatMessages.map((msg, index) => {
               const isAI = msg.sender === 'ai';
               return (
-                <div
-                  key={index}
-                  className={`flex items-start gap-4 p-4.5 rounded-lg shadow-[0_4px_14px_rgba(0,0,0,0.15)] ${isAI
-                    ? 'bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-950 dark:text-white font-medium'
-                    : 'bg-black border border-black text-white font-medium ml-6 sm:ml-12 shadow-[0_6px_18px_rgba(0,0,0,0.25)]'
-                    }`}
-                >
-                  <div className={`px-2.5 py-1 rounded-md flex-shrink-0 mt-0.5 font-bold text-xs font-tech border shadow-sm ${isAI ? 'bg-black text-white border-black' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-950 dark:text-white border-zinc-300 dark:border-zinc-700'
-                    }`}>
+                <div key={index} className={`flex items-start gap-4 p-4.5 rounded-lg shadow-[0_4px_14px_rgba(0,0,0,0.15)] ${isAI ? 'bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-950 dark:text-white font-medium' : 'bg-black border border-black text-white font-medium ml-6 sm:ml-12 shadow-[0_6px_18px_rgba(0,0,0,0.25)]'}`}>
+                  <div className={`px-2.5 py-1 rounded-md flex-shrink-0 mt-0.5 font-bold text-xs font-tech border shadow-sm ${isAI ? 'bg-black text-white border-black' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-950 dark:text-white border-zinc-300 dark:border-zinc-700'}`}>
                     {isAI ? 'AI' : 'DEV'}
                   </div>
-                  <div className="flex-1 leading-relaxed text-base font-outfit">
-                    <span className={`text-xs font-tech font-bold uppercase tracking-wider block mb-1.5 ${isAI ? 'text-zinc-500 dark:text-zinc-400' : 'text-zinc-400'}`}>
-                      {isAI ? 'Dev Assist Institutional Engine' : 'Lead Developer (You)'}
-                    </span>
+                  <div className="flex-1 leading-relaxed text-base font-outfit whitespace-pre-wrap">
                     {msg.text}
                   </div>
                 </div>
@@ -451,7 +278,6 @@ export default function BrainView({ data = mockBrainData }) {
           </div>
         </div>
 
-        {/* Card 6: Bottom Interactive Chat Bar - Floating Card rounded-xl bg-zinc-100 dark:bg-zinc-900 with aggressive floating shadow-[0_8px_24px_rgba(0,0,0,0.2)] */}
         <div className="bg-zinc-100 dark:bg-zinc-900 rounded-xl p-4 px-6 border border-white/10 shadow-[0_8px_24px_rgba(0,0,0,0.2)] flex-shrink-0">
           <form onSubmit={handleSendMessage} className="flex items-center gap-3 w-full">
             <div className="relative flex-1">
@@ -459,7 +285,7 @@ export default function BrainView({ data = mockBrainData }) {
                 type="text"
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Ask follow-up questions to the Institutional Brain (e.g., 'How do we scale pg_pool?')..."
+                placeholder="Ask follow-up questions..."
                 className="w-full bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 focus:border-zinc-500 text-sm font-bold text-zinc-950 dark:text-white rounded-lg px-4 py-3 pl-11 focus:outline-none shadow-[0_4px_14px_rgba(0,0,0,0.15)] transition-colors placeholder:text-zinc-400 font-outfit"
               />
               <MessageSquare className="w-4.5 h-4.5 text-zinc-950 dark:text-white absolute left-4 top-3.5 flex-shrink-0 pointer-events-none" />

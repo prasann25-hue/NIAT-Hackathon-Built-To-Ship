@@ -2,16 +2,17 @@ import React, { useState } from 'react';
 import { Command, ArrowRight, Lock, Terminal, Sparkles, ChevronDown } from 'lucide-react';
 
 const TOTAL_COLS = 48;
-const SCALE_FACTOR = 0.35; // ~65% reduction for fine precision grid
+const SCALE_FACTOR = 0.35; 
 const BASE_DOT_SIZES = [5, 10, 16, 26];
-const TOP_DOT_SIZES = BASE_DOT_SIZES.map((size) => size * SCALE_FACTOR); // [1.75, 3.5, 5.6, 9.1]
-const BOTTOM_DOT_SIZES = [...TOP_DOT_SIZES].reverse(); // [9.1, 5.6, 3.5, 1.75]
+const TOP_DOT_SIZES = BASE_DOT_SIZES.map((size) => size * SCALE_FACTOR); 
+const BOTTOM_DOT_SIZES = [...TOP_DOT_SIZES].reverse(); 
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export default function LandingView() {
-  const [email, setEmail] = useState('lead.architect@enterprise.dev');
-  const [password, setPassword] = useState('••••••••••••••••');
+  // Hardcoded credentials removed for production!
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
   const handleGitHubLogin = () => {
     window.location.href = `${API_BASE}/auth/github`;
@@ -36,7 +37,8 @@ export default function LandingView() {
           }
         }
       `}</style>
-      {/* Top Section (The Dark Hero Pitch) */}
+      
+      {/* Top Section */}
       <section className="w-full min-h-[85vh] bg-black flex flex-col items-center justify-center text-center px-6 py-20 relative overflow-hidden">
         <div className="max-w-3xl w-full space-y-8 z-10 my-auto">
           {/* Centered Branding Logo */}
@@ -96,13 +98,11 @@ export default function LandingView() {
           </div>
         </div>
 
-        {/* Subtle scroll hint */}
         <div className="mt-12 text-zinc-500 flex flex-col items-center gap-1 text-xs font-tech font-bold uppercase tracking-widest animate-pulse z-10">
           <span>Sign in below</span>
           <ChevronDown className="w-4 h-4 text-zinc-400" />
         </div>
 
-        {/* Dynamic Full-Width Halftone Top Boundary (White Dots on Black) */}
         <div className="absolute bottom-0 left-0 w-full h-24 flex justify-between items-end px-4 pointer-events-none z-0 pb-2.5 overflow-hidden">
           {Array.from({ length: TOTAL_COLS }).map((_, index) => {
             const distance = Math.abs(index - (TOTAL_COLS - 1) / 2) / ((TOTAL_COLS - 1) / 2);
@@ -130,9 +130,8 @@ export default function LandingView() {
         </div>
       </section>
 
-      {/* Bottom Section (The Light Auth Gateway) */}
+      {/* Bottom Section */}
       <section className="w-full min-h-[50vh] bg-zinc-100 flex items-center justify-center py-20 px-6 relative overflow-hidden">
-        {/* Dynamic Full-Width Halftone Bottom Boundary (Dark Dots on Light) */}
         <div className="absolute top-0 left-0 w-full h-24 flex justify-between items-start px-4 pointer-events-none z-0 pt-2.5 overflow-hidden">
           {Array.from({ length: TOTAL_COLS }).map((_, index) => {
             const distance = Math.abs(index - (TOTAL_COLS - 1) / 2) / ((TOTAL_COLS - 1) / 2);
@@ -159,7 +158,6 @@ export default function LandingView() {
           })}
         </div>
 
-        {/* Login Card - Pure bg-white container with deep custom shadow */}
         <div className="bg-white rounded-xl border border-zinc-300 p-8 w-full max-w-md shadow-[0_8px_24px_rgba(0,0,0,0.15)] text-zinc-950 z-10">
           <div className="space-y-1.5 mb-8">
             <h2 className="text-2xl font-bold font-outfit text-zinc-950 tracking-tight">
@@ -170,20 +168,17 @@ export default function LandingView() {
             </p>
           </div>
 
-          {/* Continue with GitHub Outline Button */}
           <button
             type="button"
             onClick={handleGitHubLogin}
             className="w-full py-3 px-4 rounded-lg bg-white hover:bg-zinc-50 text-zinc-950 font-bold font-outfit text-xs tracking-wide transition-all border border-zinc-300 hover:border-zinc-400 shadow-[0_4px_14px_rgba(0,0,0,0.08)] flex items-center justify-center gap-2.5 cursor-pointer active:translate-y-[0.5px]"
           >
-            {/* Inline GitHub Octicon SVG */}
             <svg className="w-4 h-4 fill-current text-zinc-950" viewBox="0 0 24 24">
               <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
             </svg>
             <span>Continue with GitHub</span>
           </button>
 
-          {/* OR Divider */}
           <div className="flex items-center my-6">
             <div className="flex-1 border-t border-zinc-200" />
             <span className="px-3 text-[11px] font-tech font-bold text-zinc-400 uppercase tracking-widest">
@@ -192,7 +187,6 @@ export default function LandingView() {
             <div className="flex-1 border-t border-zinc-200" />
           </div>
 
-          {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-tech font-bold uppercase text-zinc-600 tracking-wider mb-1.5">
@@ -227,7 +221,6 @@ export default function LandingView() {
             </div>
 
             <div className="pt-2">
-              {/* Primary Sign In Button */}
               <button
                 type="submit"
                 onClick={handleSubmit}
@@ -240,7 +233,6 @@ export default function LandingView() {
             </div>
           </form>
 
-          {/* Footer Security Badge */}
           <div className="mt-8 pt-6 border-t border-zinc-200/80">
             <div className="flex flex-col items-center gap-1.5 mt-6">
               <div className="flex items-center gap-2 text-xs font-tech font-bold text-zinc-500">
