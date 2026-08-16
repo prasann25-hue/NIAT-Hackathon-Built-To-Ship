@@ -207,7 +207,7 @@ app.post('/api/ops-brain', optionalAuth, async (req, res) => {
     `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-1.5-flash',
+            model: 'gemini-3.6-flash',
             contents: [
                 { role: 'user', parts: [{ text: `${systemInstruction}\n\nUser Query: ${query}` }] }
             ]
@@ -339,7 +339,7 @@ app.post('/api/architect', optionalAuth, async (req, res) => {
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-1.5-flash',
+            model: 'gemini-3.6-flash',
             contents: [
                 { role: 'user', parts: [{ text: `${systemInstruction}\n\nUser Request: ${prompt}` }] }
             ],
