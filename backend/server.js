@@ -207,7 +207,7 @@ app.post('/api/ops-brain', optionalAuth, async (req, res) => {
     `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-3.6-flash',
+            model: 'gemini-1.5-flash',
             contents: [
                 { role: 'user', parts: [{ text: `${systemInstruction}\n\nUser Query: ${query}` }] }
             ]
@@ -307,7 +307,7 @@ app.post('/api/architect', optionalAuth, async (req, res) => {
 
     const systemInstruction = `
     You are an AI Principal System Architect.
-    When given a product requirement, generate a highly detailed, structured JSON response containing system architecture, schemas, and costs.
+    When given a product requirement, generate a highly detailed, structured JSON response containing system architecture, schemas, and costs. CRITICAL FORMATTING RULE: You MUST escape all newlines within string values using \\n. DO NOT output raw, unescaped line breaks inside JSON strings.
     
     ${repoContext}
     
@@ -339,7 +339,7 @@ app.post('/api/architect', optionalAuth, async (req, res) => {
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-3.6-flash',
+            model: 'gemini-1.5-flash',
             contents: [
                 { role: 'user', parts: [{ text: `${systemInstruction}\n\nUser Request: ${prompt}` }] }
             ],
@@ -348,7 +348,16 @@ app.post('/api/architect', optionalAuth, async (req, res) => {
             }
         });
 
-        const parsedData = JSON.parse(response.text);
+    // Strip markdown code blocks if the AI accidentally includes them
+    let sanitizedText = response.text.trim();
+    if (sanitizedText.startsWith('```')) {
+        sanitizedText = sanitizedText.replace(/^```json/i, '').replace(/```$/, '').trim();
+    }
+
+// Strip any remaining rogue control characters (ASCII 0-31) except standard newlines/returns
+sanitizedText = sanitizedText.replace(/[\x00-\x09\x0B\x0C\x0E-\x1F]/g, '');
+
+const parsedData = JSON.parse(sanitizedText);
 
         // Save to saved_architectures if user is authenticated and Supabase is configured
         if (req.user && req.user.id && supabase) {
